@@ -315,7 +315,7 @@ void TemplateTable::patch_bytecode(Bytecodes::Code bc,
 
 // Individual instructions
 
-void TemplateTable::nop() {
+void TemplateTable::nop(int _) {
   transition(vtos, vtos);
 }
 

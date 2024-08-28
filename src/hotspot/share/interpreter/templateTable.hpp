@@ -124,7 +124,7 @@ class TemplateTable: AllStatic {
   static void call_VM(Register oop_result, Register last_java_sp, address entry_point, Register arg_1, Register arg_2, Register arg_3);
 
   // bytecodes
-  static void nop();
+  static void nop(int _);
 
   static void aconst_null();
   static void iconst(int value);

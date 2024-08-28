@@ -158,7 +158,7 @@ void TemplateTable::patch_bytecode(Bytecodes::Code new_bc, Register Rnew_bc, Reg
 // ============================================================================
 // Individual instructions
 
-void TemplateTable::nop() {
+void TemplateTable::nop(int _) {
   transition(vtos, vtos);
   // Nothing to do.
 }
