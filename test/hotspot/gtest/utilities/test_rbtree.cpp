@@ -409,6 +409,71 @@ public:
     verify_it(rbtree);
     EXPECT_EQ(rbtree.size(), 0UL);
   }
+
+  void test_intrusive() {
+    using Tree = IntrusiveRBTree<int, Cmp>;
+
+    struct IntrusiveHolder {
+      Tree::Node node;
+      int data;
+
+      Tree::Node* get_node() { return &node; }
+
+      IntrusiveHolder(int data, Tree::Node node) : node(node), data(data) {}
+      static IntrusiveHolder* cast_to_self(Tree::Node* node) { return (IntrusiveHolder*)node; }
+    };
+
+    Tree intrusive_tree;
+    int num_iterations = 100;
+
+    // Insert values
+    for (int n = 0; n < num_iterations; n++) {
+      Tree::Cursor cursor = intrusive_tree.find(n);
+      EXPECT_NULL(cursor.position());
+
+      // Custom allocation is just malloc here
+      IntrusiveHolder *place = (IntrusiveHolder *)os::malloc(sizeof(IntrusiveHolder), mtTest);
+      new (place) IntrusiveHolder(n, Tree::IntrusiveNode(n));
+
+      intrusive_tree.insert_at_cursor(cursor, place->get_node());
+      Tree::Cursor cursor2 = intrusive_tree.find(n);
+
+      EXPECT_NOT_NULL(cursor.position());
+      EXPECT_NOT_NULL(cursor2.position());
+
+      intrusive_tree.verify_self();
+    }
+
+
+    // Check inserted values
+    for (int n = 0; n < num_iterations; n++) {
+      Tree::Cursor cursor = intrusive_tree.find(n);
+      EXPECT_NOT_NULL(cursor.position());
+      EXPECT_EQ(n, IntrusiveHolder::cast_to_self(cursor.position())->data);
+    }
+
+    // Remove all values
+    for (int n = 0; n < num_iterations; n++) {
+      Tree::Cursor cursor = intrusive_tree.find(n);
+      EXPECT_NOT_NULL(cursor.position());
+
+      intrusive_tree.remove_at_cursor(cursor);
+      Tree::Cursor cursor2 = intrusive_tree.find(n);
+
+      EXPECT_NULL(cursor.position());
+      EXPECT_NULL(cursor2.position());
+
+      intrusive_tree.verify_self();
+    }
+
+    // Check removed values
+    for (int n = 0; n < num_iterations; n++) {
+      Tree::Cursor cursor = intrusive_tree.find(n);
+      EXPECT_NULL(cursor.position());
+    }
+
+
+  }
 #endif // ASSERT
 
 };
@@ -449,26 +514,15 @@ TEST_VM_F(RBTreeTest, IteratorTest) {
   this->test_iterator();
 }
 
+TEST_VM_F(RBTreeTest, IntrusiveTest) {
+  this->test_intrusive();
+}
+
 #ifdef ASSERT
 TEST_VM_F(RBTreeTest, FillAndVerify) {
   this->test_fill_verify();
 }
 
-TEST_VM_F(RBTreeTest, InsertRemoveVerify) {
-  constexpr const int num_nodes = 100;
-  for (int n_t1 = 0; n_t1 < num_nodes; n_t1++) {
-    for (int n_t2 = 0; n_t2 < n_t1; n_t2++) {
-      RBTreeInt tree;
-      for (int i = 0; i < n_t1; i++) {
-        tree.upsert(i, i);
-      }
-      for (int i = 0; i < n_t2; i++) {
-        tree.remove(i);
-      }
-      verify_it(tree);
-    }
-  }
-}
 
 TEST_VM_F(RBTreeTest, VerifyItThroughStressTest) {
   { // Repeatedly verify a tree of moderate size

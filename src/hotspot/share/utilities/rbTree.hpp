@@ -31,6 +31,10 @@
 #include "utilities/growableArray.hpp"
 #include <type_traits>
 
+// Pre-declaration of intrusive tree
+template <typename K, typename COMPARATOR>
+class IntrusiveRBTree;
+
 // COMPARATOR must have a static function `cmp(a,b)` which returns:
 //     - an int < 0 when a < b
 //     - an int == 0 when a == b
@@ -40,10 +44,10 @@
 // Key needs to be of a type that is trivially destructible.
 // The tree will call a value's destructor when its node is removed.
 // Nodes are address stable and will not change during its lifetime.
-
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 class RBTree {
   friend class RBTreeTest;
+  friend IntrusiveRBTree<K, COMPARATOR>;
 
 private:
   ALLOCATOR _allocator;
@@ -52,6 +56,7 @@ private:
 public:
   class RBNode {
     friend RBTree;
+    friend IntrusiveRBTree<K, COMPARATOR>;
     friend class RBTreeTest;
 
   private:
@@ -126,9 +131,12 @@ private:
     return node != nullptr && node->is_red();
   }
 
+  // Return the node if found or the would-be parent of not. found_node indicates whether the node was found or not.
+  RBNode* find_node_or_parent(RBNode* curr, const K& k, bool& found_node);
+
   RBNode* find_node(RBNode* curr, const K& k);
 
-   // If the node with key k already exist, the value is updated instead.
+  // If the node with key k already exist, the value is updated instead.
   RBNode* insert_node(const K& k, const V& v);
 
   void fix_insert_violations(RBNode* node);
@@ -289,6 +297,113 @@ private:
 public:
   using Iterator = IteratorImpl<true>; // Forward iterator
   using ReverseIterator = IteratorImpl<false>; // Backward iterator
+
+};
+
+template <typename K, typename COMPARATOR>
+class IntrusiveRBTree {
+  friend class RBTreeTest;
+
+  struct Empty {};
+  enum State { NONE, NODE, LEFT, RIGHT} uint8_t;
+  class NoopAllocator {
+  public:
+    void* allocate(size_t sz) {
+      assert(false, "intrusive tree should not use rbtree allocator");
+    }
+
+    void free(void* ptr) { /* assert here would trigger on tree destruction */
+    }
+  };
+
+  using Tree = RBTree<K, Empty, COMPARATOR, NoopAllocator>;
+
+  Tree _tree;
+
+public:
+  using Node = typename Tree::RBNode;
+
+  static Node IntrusiveNode(const K& k) { return Node(k, Empty()); }
+
+  IntrusiveRBTree() {};
+  ~IntrusiveRBTree() {};
+
+  struct Cursor {
+    State node_state = NONE;
+    Node* node = nullptr;
+    Node* position() {
+      if (node_state == NONE) return nullptr;                   // tree is empty
+      if (node_state == NODE) return node;                      // node points to existing node
+      return (node_state == LEFT ? node->_left : node->_right); // node points to parent
+    }
+  };
+
+  Cursor find(K k) {
+    Cursor cursor;
+    bool found_node;
+    Node* node = _tree.find_node_or_parent( _tree._root, k, found_node);
+    if (node != nullptr) {
+      cursor.node = node;
+      if (found_node) {
+        cursor.node_state = NODE;
+      } else {
+        cursor.node_state = COMPARATOR::cmp(k, node->key()) < 0 ? LEFT : RIGHT;
+      }
+    }
+    return cursor;
+  }
+
+  void insert_at_cursor(Cursor& cursor, Node* node) {
+    assert(cursor.node_state != NODE, "cant be");
+    _tree._num_nodes++;
+
+    if (cursor.node_state == NONE) {
+      _tree._root = node;
+      cursor.node_state = NODE;
+      cursor.node = node;
+      return;
+    }
+
+    node->_parent = cursor.node;
+
+    if (cursor.node_state == LEFT) {
+      cursor.node->_left = node;
+    } else {
+      cursor.node->_right = node;
+    }
+
+    _tree.fix_insert_violations(node);
+    cursor.node_state = NODE;
+    cursor.node = node;
+  }
+
+  void remove_at_cursor(Cursor& cursor) {
+    assert(cursor.node_state != NONE, "cant be");
+
+    Node* node;
+    if (cursor.node_state == NODE) {
+      node = cursor.node;
+    } else if (cursor.node_state == LEFT) {
+      node = cursor.node->_left;
+    } else {
+      node = cursor.node->_right;
+    }
+
+    _tree.remove(node);
+    cursor.node_state = NONE;
+    cursor.node = nullptr;
+  }
+
+  void replace(Cursor& cursor, Node* new_node) {
+    if (cursor.node == new_node)
+      return;
+  }
+
+#ifdef ASSERT
+  void verify_self() {
+    _tree.verify_self();
+  }
+#endif // ASSERT
 
 };
 

@@ -131,37 +131,13 @@ inline size_t RBTree<K, V, COMPARATOR, ALLOCATOR>::RBNode::count_nodes() const {
 
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 inline typename RBTree<K, V, COMPARATOR, ALLOCATOR>::RBNode*
-RBTree<K, V, COMPARATOR, ALLOCATOR>::find_node(RBNode* curr, const K& k) {
-  while (curr != nullptr) {
-    int key_cmp_k = COMPARATOR::cmp(k, curr->key());
-
-    if (key_cmp_k == 0) {
-      return curr;
-    } else if (key_cmp_k < 0) {
-      curr = curr->_left;
-    } else {
-      curr = curr->_right;
-    }
-  }
-
-  return nullptr;
-}
-
-template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
-inline typename RBTree<K, V, COMPARATOR, ALLOCATOR>::RBNode*
-RBTree<K, V, COMPARATOR, ALLOCATOR>::insert_node(const K& k, const V& v) {
-  RBNode* curr = _root;
-  if (curr == nullptr) { // Tree is empty
-    _root = allocate_node(k, v);
-    return _root;
-  }
-
+RBTree<K, V, COMPARATOR, ALLOCATOR>::find_node_or_parent(RBNode* curr, const K& k, bool& found_node) {
   RBNode* parent = nullptr;
   while (curr != nullptr) {
     int key_cmp_k = COMPARATOR::cmp(k, curr->key());
 
     if (key_cmp_k == 0) {
-      curr->_value = v;
+      found_node = true;
       return curr;
     }
 
@@ -172,9 +148,36 @@ RBTree<K, V, COMPARATOR, ALLOCATOR>::insert_node(const K& k, const V& v) {
       curr = curr->_right;
     }
   }
+  found_node = false;
+  return parent;
+}
+
+template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
+inline typename RBTree<K, V, COMPARATOR, ALLOCATOR>::RBNode*
+RBTree<K, V, COMPARATOR, ALLOCATOR>::find_node(RBNode* curr, const K& k) {
+  bool found_node;
+  curr = find_node_or_parent(curr, k, found_node);
+  return found_node ? curr : nullptr;
+}
+
+template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
+inline typename RBTree<K, V, COMPARATOR, ALLOCATOR>::RBNode*
+RBTree<K, V, COMPARATOR, ALLOCATOR>::insert_node(const K& k, const V& v) {
+  if (_root == nullptr) { // Tree is empty
+    _root = allocate_node(k, v);
+    return _root;
+  }
+
+  bool found_node;
+  RBNode* node = find_node_or_parent(_root, k, found_node);
+  if (found_node) {
+    node->_value = v;
+    return node;
+  }
 
   // Create and insert new node
-  RBNode* node = allocate_node(k, v);
+  RBNode* parent = node;
+  node = allocate_node(k, v);
   node->_parent = parent;
 
   int key_cmp_k = COMPARATOR::cmp(k, parent->key());
@@ -475,7 +478,7 @@ inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::visit_range_in_order(const K& f
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::verify_self() {
   if (_root == nullptr) {
-    assert(_num_nodes == 0, "rbtree has nodes but no root");
+    assert(_num_nodes == 0, "rbtree has " SIZE_FORMAT " nodes but no root", _num_nodes);
     return;
   }
 
