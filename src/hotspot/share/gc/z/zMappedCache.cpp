@@ -36,13 +36,9 @@ class ZMappedCacheEntry {
 private:
   using Node = IntrusiveRBTree<zoffset, ZMappedCache::EntryCompare>::RBNode;
   Node _node;
-  zoffset* _start;
   ZMappedCache::ZSizeClassListNode _size_class_list_nodes[ARRAY_SIZE(ZMappedCache::SizeClasses)];
 public:
-  ZMappedCacheEntry(zoffset start) : _node(Node(start)), _size_class_list_nodes{} {
-    // _start = &_node.key();
-    _start = &const_cast<zoffset&>(_node.key());
-  }
+  ZMappedCacheEntry(zoffset start) : _node(Node(start)), _size_class_list_nodes{} {}
 
   zoffset start() const { return _node.key(); }
   zoffset_end end() const {
@@ -56,8 +52,7 @@ public:
   Node* node_addr() { return &_node; }
 
   void update_start(zoffset start) {
-    // *const_cast<zoffset*>(&_node.key()) = start;
-    *_start = start;
+    const_cast<zoffset&>(_node.key()) = start;
    }
 
   static ZMappedCacheEntry* cast_to_entry(Node* node);
