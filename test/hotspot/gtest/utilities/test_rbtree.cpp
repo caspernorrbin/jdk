@@ -22,7 +22,6 @@
  *
  */
 
-#include "precompiled.hpp"
 #include "memory/resourceArea.hpp"
 #include "runtime/os.hpp"
 #include "testutils.hpp"
@@ -30,7 +29,6 @@
 #include "utilities/growableArray.hpp"
 #include "utilities/rbTree.hpp"
 #include "utilities/rbTree.inline.hpp"
-#include <cstddef>
 
 
 class RBTreeTest : public testing::Test {
