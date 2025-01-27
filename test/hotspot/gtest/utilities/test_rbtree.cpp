@@ -588,11 +588,11 @@ TEST_VM_F(RBTreeTest, CursorIterateTest) {
   this->test_cursor_iterate();
 }
 
+#ifdef ASSERT
 TEST_VM_F(RBTreeTest, IntrusiveTest) {
   this->test_intrusive();
 }
 
-#ifdef ASSERT
 TEST_VM_F(RBTreeTest, FillAndVerify) {
   this->test_fill_verify();
 }

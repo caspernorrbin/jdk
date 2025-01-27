@@ -74,9 +74,17 @@ public:
     RBNode(const K& k, const V& v)
         : _parent(nullptr), _left(nullptr), _right(nullptr),
           _key(k), _value(v), _color(RED) {}
-      RBNode(const K& k)
+    RBNode(const K& k)
         : _parent(nullptr), _left(nullptr), _right(nullptr),
           _key(k), _value(Empty()), _color(RED) {}
+
+    // Gets the previous in-order node in the tree.
+    // nullptr is returned if there is no previous node.
+    RBNode* prev();
+
+    // Gets the next in-order node in the tree.
+    // nullptr is returned if there is no next node.
+    RBNode* next();
 
   private:
     bool is_black() const { return _color == BLACK; }
@@ -84,7 +92,6 @@ public:
 
     void set_black() { _color = BLACK; }
     void set_red() { _color = RED; }
-
 
     bool is_right_child() const {
       return _parent != nullptr && _parent->_right == this;
@@ -102,17 +109,13 @@ public:
     // Move node down to the right, and left child up
     RBNode* rotate_right();
 
-    RBNode* prev();
-
-    RBNode* next();
-
   #ifdef ASSERT
     bool is_correct(unsigned int num_blacks, unsigned int maximum_depth, unsigned int current_depth, RBNode* first) const;
     size_t count_nodes() const;
   #endif // ASSERT
   };
 
-  // Represents the location of a (would be) node in the tree
+  // Represents the location of a (would be) node in the tree.
   // If a cursor is valid (valid() == true) it points somewhere in the tree.
   // If the cursor points to an existing node (found() == true), node() can be used to access that node,
   // Otherwise nullptr is returned, regardless if the node is valid or not.
@@ -124,10 +127,10 @@ public:
     Cursor(RBNode** insert_location, RBNode* parent) : _insert_location(insert_location), _parent(parent) {}
 
   public:
-    bool valid() { return _insert_location != nullptr; }
-    bool found() { return *_insert_location != nullptr; }
+    bool valid() const { return _insert_location != nullptr; }
+    bool found() const { return *_insert_location != nullptr; }
     RBNode* node() { return _insert_location == nullptr ? nullptr : *_insert_location; }
-    const RBNode* node() const { return _insert_location == nullptr ? nullptr : *_insert_location; }
+    RBNode* node() const { return _insert_location == nullptr ? nullptr : *_insert_location; }
   };
 
 private:
@@ -176,31 +179,30 @@ public:
 
   // Moves to the next valid node.
   // If no next node exist, the cursor becomes invalid.
-  Cursor next(Cursor& cursor);
+  Cursor next(const Cursor& cursor);
 
   // Moves to the previous valid node.
   // If no previous node exist, the cursor becomes invalid.
-  Cursor prev(Cursor& cursor);
+  Cursor prev(const Cursor& cursor);
 
   // Finds the cursor to the node associated with the given key.
   Cursor cursor_find(const K& key);
 
   // Inserts the given node at the cursor location
   // The cursor must not point to an existing node
-  void insert_at_cursor(RBNode* node, Cursor& cursor);
+  void insert_at_cursor(RBNode* node, const Cursor& cursor);
 
   // Removes the node referenced by the cursor
   // The cursor must point to a valid existing node
-  void remove_at_cursor(Cursor& cursor);
+  void remove_at_cursor(const Cursor& cursor);
 
-  // Replace the node referenced by the cursor with a new node
-  // The cursor must point to a valid existing node
-  // The old is be destroyed
+  // Replace the node referenced by the cursor with a new node.
+  // The old node is destroyed.
   // The user must ensure that no tree properties are broken:
   // There must not exist any node with the same key
   // For all nodes with key < old_node, must also have key < new_node
   // For all nodes with key > old_node, must also have key > new_node
-  void replace_at_cursor(RBNode *new_node, Cursor &cursor);
+  void replace_at_cursor(RBNode *new_node, const Cursor &cursor);
 
   // Finds the value of the node associated with the given key.
   V* find(const K& key) {
