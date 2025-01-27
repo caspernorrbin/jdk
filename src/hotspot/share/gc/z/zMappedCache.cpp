@@ -27,18 +27,24 @@
 #include "gc/z/zVirtualMemory.inline.hpp"
 #include "utilities/align.hpp"
 #include "utilities/globalDefinitions.hpp"
+#include "utilities/rbTree.hpp"
+#include "utilities/rbTree.inline.hpp"
 
 constexpr size_t ZMappedCache::SizeClasses[];
 
 class ZMappedCacheEntry {
 private:
-  zoffset _start;
-  ZIntrusiveRBTreeNode _node;
+  using Node = IntrusiveRBTree<zoffset, ZMappedCache::EntryCompare>::RBNode;
+  Node _node;
+  zoffset* _start;
   ZMappedCache::ZSizeClassListNode _size_class_list_nodes[ARRAY_SIZE(ZMappedCache::SizeClasses)];
 public:
-  ZMappedCacheEntry(zoffset start) : _start(start), _node(), _size_class_list_nodes{} {}
+  ZMappedCacheEntry(zoffset start) : _node(Node(start)), _size_class_list_nodes{} {
+    // _start = &_node.key();
+    _start = &const_cast<zoffset&>(_node.key());
+  }
 
-  zoffset start() const { return _start; }
+  zoffset start() const { return _node.key(); }
   zoffset_end end() const {
     const uintptr_t this_addr = reinterpret_cast<uintptr_t>(this);
     return zoffset_end(align_up(this_addr, ZGranuleSize) - ZAddressHeapBase);
@@ -47,11 +53,14 @@ public:
     return ZVirtualMemory(start(), end() - start());
   }
 
-  ZIntrusiveRBTreeNode* node_addr() { return &_node; }
+  Node* node_addr() { return &_node; }
 
-  void update_start(zoffset start) { _start = start; }
+  void update_start(zoffset start) {
+    // *const_cast<zoffset*>(&_node.key()) = start;
+    *_start = start;
+   }
 
-  static ZMappedCacheEntry* cast_to_entry(ZIntrusiveRBTreeNode* node);
+  static ZMappedCacheEntry* cast_to_entry(Node* node);
   static ZMappedCacheEntry* cast_to_entry(ZMappedCache::ZSizeClassListNode* node, size_t index);
 
   ZMappedCache::ZSizeClassListNode* size_class_node(size_t index) {
@@ -59,7 +68,7 @@ public:
   }
 };
 
-ZMappedCacheEntry* ZMappedCacheEntry::cast_to_entry(ZIntrusiveRBTreeNode* node) {
+ZMappedCacheEntry* ZMappedCacheEntry::cast_to_entry(Node* node) {
   return (ZMappedCacheEntry*)((uintptr_t)node - offset_of(ZMappedCacheEntry, _node));
 }
 
@@ -86,19 +95,6 @@ static ZMappedCacheEntry* create_entry(const ZVirtualMemory& vmem) {
   return new (entry_address_for_zoffset_end(vmem.end())) ZMappedCacheEntry(vmem.start());
 }
 
-int ZMappedCache::EntryCompare::operator()(ZIntrusiveRBTreeNode* a, ZIntrusiveRBTreeNode* b) {
-  ZVirtualMemory vmem_a = ZMappedCacheEntry::cast_to_entry(a)->vmem();
-  ZVirtualMemory vmem_b = ZMappedCacheEntry::cast_to_entry(b)->vmem();
-  if (vmem_a.end() < vmem_b.start()) { return -1; }
-  if (vmem_b.end() < vmem_a.start()) { return 1; }
-  return 0; // Overlapping
-}
-int ZMappedCache::EntryCompare::operator()(zoffset key, ZIntrusiveRBTreeNode* node) {
-  ZVirtualMemory vmem = ZMappedCacheEntry::cast_to_entry(node)->vmem();
-  if (key < vmem.start()) { return -1; }
-  if (key > vmem.end()) { return 1; }
-  return 0; // Containing
-}
 
 size_t ZMappedCache::get_size_class(size_t index) {
   if (index == 0 && ZPageSizeMedium > ZPageSizeSmall) {
@@ -107,7 +103,7 @@ size_t ZMappedCache::get_size_class(size_t index) {
   return SizeClasses[index];
 }
 
-void ZMappedCache::insert(const Tree::FindCursor& cursor, const ZVirtualMemory& vmem) {
+void ZMappedCache::insert(const Tree::Cursor& cursor, const ZVirtualMemory& vmem) {
   // Create new entry
   ZMappedCacheEntry* entry = create_entry(vmem);
 
@@ -115,7 +111,7 @@ void ZMappedCache::insert(const Tree::FindCursor& cursor, const ZVirtualMemory& 
   assert(entry->end() == vmem.end(), "must be");
 
   // And insert it in tree
-  _tree.insert(entry->node_addr(), cursor);
+  _tree.insert_at_cursor(entry->node_addr(), cursor);
 
   // And in size class lists
   const size_t size = vmem.size();
@@ -127,15 +123,15 @@ void ZMappedCache::insert(const Tree::FindCursor& cursor, const ZVirtualMemory& 
   }
 }
 
-void ZMappedCache::remove(const Tree::FindCursor& cursor, const ZVirtualMemory& vmem) {
-  ZIntrusiveRBTreeNode* const node = cursor.node();
+void ZMappedCache::remove(const Tree::Cursor& cursor, const ZVirtualMemory& vmem) {
+  Node* const node = cursor.node();
   ZMappedCacheEntry* entry = ZMappedCacheEntry::cast_to_entry(node);
 
   assert(entry->start() == vmem.start(), "must be");
   assert(entry->end() == vmem.end(), "must be");
 
   // Remove from tree
-  _tree.remove(cursor);
+  _tree.remove_at_cursor(cursor);
   // And in size class lists
   const size_t size = vmem.size();
   for (size_t i = 0; i < NumSizeClasses; i++) {
@@ -148,19 +144,19 @@ void ZMappedCache::remove(const Tree::FindCursor& cursor, const ZVirtualMemory& 
   entry->~ZMappedCacheEntry();
 }
 
-void ZMappedCache::replace(const Tree::FindCursor& cursor, const ZVirtualMemory& vmem) {
+void ZMappedCache::replace(const Tree::Cursor& cursor, const ZVirtualMemory& vmem) {
   // Create new entry
   ZMappedCacheEntry* entry = create_entry(vmem);
 
   assert(entry->start() == vmem.start(), "must be");
   assert(entry->end() == vmem.end(), "must be");
 
-  ZIntrusiveRBTreeNode* const node = cursor.node();
+  Node* const node = cursor.node();
   ZMappedCacheEntry* old_entry = ZMappedCacheEntry::cast_to_entry(node);
   assert(old_entry->end() != vmem.end(), "should not replace, use update");
 
   // Replace in tree
-  _tree.replace(entry->node_addr(), cursor);
+  _tree.replace_at_cursor(entry->node_addr(), cursor);
   // And in size class lists
   const size_t new_size = vmem.size();
   const size_t old_size = old_entry->vmem().size();
@@ -207,13 +203,13 @@ ZMappedCache::ZMappedCache()
 
 void ZMappedCache::insert_mapping(const ZVirtualMemory& vmem) {
   _size += vmem.size();
-  auto current_cursor = _tree.find(vmem.start());
+  auto current_cursor = _tree.cursor_find(vmem.start());
   auto next_cursor = _tree.next(current_cursor);
   const bool extends_left = current_cursor.found();
-  const bool extends_right = next_cursor.is_valid() &&
+  const bool extends_right = next_cursor.valid() &&
                              ZMappedCacheEntry::cast_to_entry(next_cursor.node())->start() == vmem.end();
   if (extends_left && extends_right) {
-    ZIntrusiveRBTreeNode* const next_node = next_cursor.node();
+    Node* const next_node = next_cursor.node();
     const ZVirtualMemory left_vmem = ZMappedCacheEntry::cast_to_entry(current_cursor.node())->vmem();
     const ZVirtualMemory right_vmem = ZMappedCacheEntry::cast_to_entry(next_node)->vmem();
     assert(left_vmem.adjacent_to(vmem), "must be");
@@ -264,14 +260,14 @@ size_t ZMappedCache::remove_mappings(ZArray<ZVirtualMemory>* mappings, size_t si
   precond(size > 0);
   precond(size % ZGranuleSize == 0);
   size_t removed = 0;
-  const auto remove_mapping = [&](ZIntrusiveRBTreeNode* node) {
+  const auto remove_mapping = [&](Node* node) {
     ZMappedCacheEntry* entry = ZMappedCacheEntry::cast_to_entry(node);
     ZVirtualMemory mapped_vmem = entry->vmem();
     size_t after_remove = removed + mapped_vmem.size();
 
     if (after_remove <= size) {
       auto cursor = _tree.get_cursor(node);
-      assert(cursor.is_valid(), "must be");
+      assert(cursor.valid(), "must be");
       remove(cursor, mapped_vmem);
       removed = after_remove;
       mappings->append(mapped_vmem);
@@ -311,9 +307,9 @@ size_t ZMappedCache::remove_mappings(ZArray<ZVirtualMemory>* mappings, size_t si
   }
 
   // Find what mappings to remove
-  ZIntrusiveRBTreeNode* node = _tree.first();
+  Node* node = _tree.first();
   while (node != nullptr) {
-    ZIntrusiveRBTreeNode* next_node = node->next();
+    Node* next_node = node->next();
     if (remove_mapping(node)) {
       assert(removed == size, "must be");
       _size -= size;
@@ -329,13 +325,13 @@ size_t ZMappedCache::remove_mappings(ZArray<ZVirtualMemory>* mappings, size_t si
 }
 
 bool ZMappedCache::remove_mapping_contiguous(ZVirtualMemory* mapping, size_t size) {
-  const auto remove_mapping = [&](ZIntrusiveRBTreeNode* node) {
+  const auto remove_mapping = [&](Node* node) {
     ZMappedCacheEntry* entry = ZMappedCacheEntry::cast_to_entry(node);
     ZVirtualMemory mapped_vmem = entry->vmem();
 
     if (mapped_vmem.size() == size) {
       auto cursor = _tree.get_cursor(node);
-      assert(cursor.is_valid(), "must be");
+      assert(cursor.valid(), "must be");
       remove(cursor, mapped_vmem);
       *mapping = mapped_vmem;
       return true;
@@ -369,7 +365,7 @@ bool ZMappedCache::remove_mapping_contiguous(ZVirtualMemory* mapping, size_t siz
   }
 
   // Scan whole tree
-  ZIntrusiveRBTreeNode* node = _tree.first();
+  Node* node = _tree.first();
   while (node != nullptr) {
     if (remove_mapping(node)) {
       _size -= size;

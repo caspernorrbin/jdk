@@ -28,6 +28,7 @@
 #include "utilities/debug.hpp"
 #include "utilities/powerOfTwo.hpp"
 #include "utilities/rbTree.hpp"
+#include <utility> // for std::swap
 
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::RBNode::replace_child(
@@ -188,7 +189,7 @@ RBTree<K, V, COMPARATOR, ALLOCATOR>::get_cursor(RBNode* node) {
 
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 inline typename RBTree<K, V, COMPARATOR, ALLOCATOR>::Cursor
-RBTree<K, V, COMPARATOR, ALLOCATOR>::next(Cursor& cursor) {
+RBTree<K, V, COMPARATOR, ALLOCATOR>::next(const Cursor& cursor) {
   if (cursor.found()) {
     return get_cursor(cursor.node()->next());
   }
@@ -207,7 +208,7 @@ RBTree<K, V, COMPARATOR, ALLOCATOR>::next(Cursor& cursor) {
 
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 inline typename RBTree<K, V, COMPARATOR, ALLOCATOR>::Cursor
-RBTree<K, V, COMPARATOR, ALLOCATOR>::prev(Cursor& cursor) {
+RBTree<K, V, COMPARATOR, ALLOCATOR>::prev(const Cursor& cursor) {
   if (cursor.found()) {
     return get_cursor(cursor.node()->prev());
   }
@@ -247,7 +248,7 @@ RBTree<K, V, COMPARATOR, ALLOCATOR>::cursor_find(const K& key) {
 }
 
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
-inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::insert_at_cursor(RBNode* node, Cursor& cursor) {
+inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::insert_at_cursor(RBNode* node, const Cursor& cursor) {
   assert(cursor.valid() && !cursor.found(), "must be");
   _num_nodes++;
 
@@ -266,7 +267,7 @@ inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::insert_at_cursor(RBNode* node, 
 }
 
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
-inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::remove_at_cursor(Cursor& cursor) {
+inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::remove_at_cursor(const Cursor& cursor) {
   assert(cursor.valid() && cursor.found(), "must be");
   _num_nodes--;
 
@@ -312,7 +313,7 @@ inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::remove_at_cursor(Cursor& cursor
 }
 
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
-inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::replace_at_cursor(RBNode* new_node, Cursor& cursor) {
+inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::replace_at_cursor(RBNode* new_node, const Cursor& cursor) {
   assert(cursor.valid() && cursor.found(), "must be");
   RBNode* old_node = cursor.node();
   if (old_node == new_node) {
@@ -568,7 +569,7 @@ inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::visit_range_in_order(const K& f
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::verify_self() {
   if (_root == nullptr) {
-    assert(_num_nodes == 0, "rbtree has " SIZE_FORMAT " nodes but no root", _num_nodes);
+    assert(_num_nodes == 0, "rbtree has %zu nodes but no root", _num_nodes);
     return;
   }
 
@@ -588,8 +589,8 @@ inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::verify_self() {
   const unsigned int maximum_depth = log2i(size() + 1) * 2;
 
   assert(expected_num_nodes == actual_num_nodes,
-         "unexpected number of nodes in rbtree. expected: " SIZE_FORMAT
-         ", actual: " SIZE_FORMAT, expected_num_nodes, actual_num_nodes);
+         "unexpected number of nodes in rbtree. expected: %zu \
+         , actual: %zu" , expected_num_nodes, actual_num_nodes);
   assert(2 * black_nodes <= maximum_depth,
          "rbtree is too deep for its number of nodes. can be at "
          "most: " INT32_FORMAT ", but is: " UINT32_FORMAT, maximum_depth, 2 * black_nodes);

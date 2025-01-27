@@ -78,6 +78,10 @@ public:
         : _parent(nullptr), _left(nullptr), _right(nullptr),
           _key(k), _value(Empty()), _color(RED) {}
 
+    RBNode* prev();
+
+    RBNode* next();
+
   private:
     bool is_black() const { return _color == BLACK; }
     bool is_red() const { return _color == RED; }
@@ -102,10 +106,6 @@ public:
     // Move node down to the right, and left child up
     RBNode* rotate_right();
 
-    RBNode* prev();
-
-    RBNode* next();
-
   #ifdef ASSERT
     bool is_correct(unsigned int num_blacks, unsigned int maximum_depth, unsigned int current_depth, RBNode* first) const;
     size_t count_nodes() const;
@@ -124,10 +124,10 @@ public:
     Cursor(RBNode** insert_location, RBNode* parent) : _insert_location(insert_location), _parent(parent) {}
 
   public:
-    bool valid() { return _insert_location != nullptr; }
-    bool found() { return *_insert_location != nullptr; }
+    bool valid() const { return _insert_location != nullptr; }
+    bool found() const { return *_insert_location != nullptr; }
     RBNode* node() { return _insert_location == nullptr ? nullptr : *_insert_location; }
-    const RBNode* node() const { return _insert_location == nullptr ? nullptr : *_insert_location; }
+    RBNode* node() const { return _insert_location == nullptr ? nullptr : *_insert_location; }
   };
 
 private:
@@ -176,22 +176,22 @@ public:
 
   // Moves to the next valid node.
   // If no next node exist, the cursor becomes invalid.
-  Cursor next(Cursor& cursor);
+  Cursor next(const Cursor& cursor);
 
   // Moves to the previous valid node.
   // If no previous node exist, the cursor becomes invalid.
-  Cursor prev(Cursor& cursor);
+  Cursor prev(const Cursor& cursor);
 
   // Finds the cursor to the node associated with the given key.
   Cursor cursor_find(const K& key);
 
   // Inserts the given node at the cursor location
   // The cursor must not point to an existing node
-  void insert_at_cursor(RBNode* node, Cursor& cursor);
+  void insert_at_cursor(RBNode* node, const Cursor& cursor);
 
   // Removes the node referenced by the cursor
   // The cursor must point to a valid existing node
-  void remove_at_cursor(Cursor& cursor);
+  void remove_at_cursor(const Cursor& cursor);
 
   // Replace the node referenced by the cursor with a new node
   // The cursor must point to a valid existing node
@@ -200,7 +200,7 @@ public:
   // There must not exist any node with the same key
   // For all nodes with key < old_node, must also have key < new_node
   // For all nodes with key > old_node, must also have key > new_node
-  void replace_at_cursor(RBNode *new_node, Cursor &cursor);
+  void replace_at_cursor(RBNode *new_node, const Cursor &cursor);
 
   // Finds the value of the node associated with the given key.
   V* find(const K& key) {

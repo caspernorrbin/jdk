@@ -25,9 +25,10 @@
 #define SHARE_GC_Z_ZMAPPEDCACHE_HPP
 
 #include "gc/z/zArray.hpp"
-#include "gc/z/zIntrusiveRBTree.hpp"
 #include "gc/z/zVirtualMemory.hpp"
 #include "utilities/globalDefinitions.hpp"
+#include "utilities/rbTree.hpp"
+#include "utilities/rbTree.inline.hpp"
 
 class ZMappedCacheEntry;
 class ZMappedCache {
@@ -36,12 +37,15 @@ class ZMappedCache {
 
 private:
   struct EntryCompare {
-    int operator()(ZIntrusiveRBTreeNode* a, ZIntrusiveRBTreeNode* b);
-    int operator()(zoffset key, ZIntrusiveRBTreeNode* node);
+    static int cmp(zoffset a, zoffset b) {
+      if (a < b) return 1;
+      if (a > b) return -1;
+      return 0;
+    }
   };
 
-  using Tree = ZIntrusiveRBTree<zoffset, EntryCompare>;
-  using Node = ZIntrusiveRBTreeNode;
+  using Tree = IntrusiveRBTree<zoffset, EntryCompare>;
+  using Node = Tree::RBNode;
 
   struct ZSizeClassListNode {
     ZListNode<ZSizeClassListNode> _node;
@@ -56,9 +60,9 @@ private:
 
   static size_t get_size_class(size_t index);
 
-  void insert(const Tree::FindCursor& cursor, const ZVirtualMemory& vmem);
-  void remove(const Tree::FindCursor& cursor, const ZVirtualMemory& vmem);
-  void replace(const Tree::FindCursor& cursor, const ZVirtualMemory& vmem);
+  void insert(const Tree::Cursor& cursor, const ZVirtualMemory& vmem);
+  void remove(const Tree::Cursor& cursor, const ZVirtualMemory& vmem);
+  void replace(const Tree::Cursor& cursor, const ZVirtualMemory& vmem);
   void update(ZMappedCacheEntry* entry, const ZVirtualMemory& vmem);
 
 public:
