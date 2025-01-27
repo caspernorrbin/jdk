@@ -28,7 +28,6 @@
 #include "nmt/memTag.hpp"
 #include "runtime/os.hpp"
 #include "utilities/globalDefinitions.hpp"
-#include "utilities/growableArray.hpp"
 #include <type_traits>
 
 struct Empty {};
@@ -57,26 +56,26 @@ public:
     friend class RBTreeTest;
 
   private:
-    RBNode* _parent;
+    uintptr_t _parent; // LSB encodes color information. 0 = RED, 1 = BLACK
     RBNode* _left;
     RBNode* _right;
 
     const K _key;
     V _value;
 
-    enum Color : uint8_t { BLACK, RED };
-    Color _color;
+    DEBUG_ONLY(bool _visited);
 
   public:
     const K& key() const { return _key; }
     V& val() { return _value; }
+    V& val() const { return _value; }
 
     RBNode(const K& k, const V& v)
-        : _parent(nullptr), _left(nullptr), _right(nullptr),
-          _key(k), _value(v), _color(RED) {}
+        : _parent(0), _left(nullptr), _right(nullptr),
+          _key(k), _value(v) DEBUG_ONLY(COMMA _visited(false)) {}
     RBNode(const K& k)
-        : _parent(nullptr), _left(nullptr), _right(nullptr),
-          _key(k), _value(Empty()), _color(RED) {}
+        : _parent(0), _left(nullptr), _right(nullptr),
+          _key(k), _value(Empty()) DEBUG_ONLY(COMMA _visited(false)) {}
 
     // Gets the previous in-order node in the tree.
     // nullptr is returned if there is no previous node.
@@ -87,32 +86,38 @@ public:
     RBNode* next();
 
   private:
-    bool is_black() const { return _color == BLACK; }
-    bool is_red() const { return _color == RED; }
+    bool is_black() const { return (_parent & 0x1) != 0; }
+    bool is_red() const { return (_parent & 0x1) == 0; }
 
-    void set_black() { _color = BLACK; }
-    void set_red() { _color = RED; }
+    void set_black() { _parent = _parent | 0x1; }
+    void set_red() { _parent = _parent & ~0x1; }
+
+    RBNode* parent() const { return (RBNode*)(_parent & ~0x1); }
+    void set_parent(RBNode* new_parent) {_parent = (_parent & 0x1) | ((uintptr_t)new_parent & ~0x1); }
 
     bool is_right_child() const {
-      return _parent != nullptr && _parent->_right == this;
+      return parent() != nullptr && parent()->_right == this;
     }
 
     bool is_left_child() const {
-      return _parent != nullptr && _parent->_left == this;
+      return parent() != nullptr && parent()->_left == this;
     }
 
     void replace_child(RBNode* old_child, RBNode* new_child);
 
-    // Move node down to the left, and right child up
+    // This node down, right child up
+    // Returns right child (now parent)
     RBNode* rotate_left();
 
-    // Move node down to the right, and left child up
+    // This node down, left child up
+    // Returns left child (now parent)
     RBNode* rotate_right();
 
   #ifdef ASSERT
-    bool is_correct(unsigned int num_blacks, unsigned int maximum_depth, unsigned int current_depth, RBNode* first) const;
-    size_t count_nodes() const;
-  #endif // ASSERT
+    void verify(size_t& num_nodes, size_t& black_nodes_until_leaf,
+                size_t& shortest_leaf_path, size_t& longest_leaf_path,
+                size_t& tree_depth, bool expect_visited);
+#endif // ASSERT
   };
 
   // Represents the location of a (would be) node in the tree.
@@ -136,6 +141,7 @@ public:
 private:
   RBNode* _root;
   RBNode* _first;
+  DEBUG_ONLY(bool _expected_visited);
 
   RBNode* allocate_node(const K& k, const V& v) {
     void* node_place = _allocator.allocate(sizeof(RBNode));
@@ -148,13 +154,17 @@ private:
     _allocator.free(node);
   }
 
-  static inline bool is_black(RBNode* node) {
+  // True if node is black (nil nodes count as black)
+  static inline bool is_black(const RBNode* node) {
     return node == nullptr || node->is_black();
   }
 
-  static inline bool is_red(RBNode* node) {
+  static inline bool is_red(const RBNode* node) {
     return node != nullptr && node->is_red();
   }
+
+  // If the node with key k already exist, the value is updated instead.
+  RBNode* insert_node(const K& k, const V& v);
 
   void fix_insert_violations(RBNode* node);
 
@@ -166,7 +176,7 @@ private:
 public:
   NONCOPYABLE(RBTree);
 
-  RBTree() : _allocator(), _num_nodes(0), _root(nullptr), _first(nullptr) {
+  RBTree() : _allocator(), _num_nodes(0), _root(nullptr), _first(nullptr) DEBUG_ONLY(COMMA _expected_visited(false)) {
     static_assert(std::is_trivially_destructible<K>::value, "key type must be trivially destructable");
   }
   ~RBTree() { if (!std::is_same<ALLOCATOR, RBTreeNoopAllocator>::value) this->remove_all(); }
@@ -210,10 +220,19 @@ public:
     return cursor.found() ? &cursor.node()->_value : nullptr;
   }
 
+  V* find(const K& key) const {
+    const Cursor cursor = cursor_find(key);
+    return cursor.found() ? &cursor.node()->_value : nullptr;
+  }
+
   // Finds the node associated with the given key.
   RBNode* find_node(const K& key) {
     Cursor cursor = cursor_find(key);
     return cursor.node();
+  }
+
+  RBNode* find_node(const K& k) const {
+    return const_cast<RBTree<K, V, COMPARATOR, ALLOCATOR>*>(this)->find_node(k);
   }
 
   // Inserts a node with the given k/v into the tree,
@@ -251,20 +270,24 @@ public:
 
   // Removes all existing nodes from the tree.
   void remove_all() {
-    GrowableArrayCHeap<RBNode*, mtInternal> to_delete(2 * log2i(_num_nodes + 1));
-    to_delete.push(_root);
+    RBNode* to_delete[64];
+    int stack_idx = 0;
+    to_delete[stack_idx++] = _root;
 
-    while (!to_delete.is_empty()) {
-      RBNode* head = to_delete.pop();
+    while (stack_idx > 0) {
+      RBNode* head = to_delete[--stack_idx];
       if (head == nullptr) continue;
-      to_delete.push(head->_left);
-      to_delete.push(head->_right);
+      to_delete[stack_idx++] = head->_left;
+      to_delete[stack_idx++] = head->_right;
       free_node(head);
     }
     _num_nodes = 0;
     _root = nullptr;
     _first = nullptr;
   }
+
+  // Alters behaviour of closest_(leq/gt) functions to include/exclude the exact value
+  enum BoundMode : uint8_t { EXCLUSIVE, INCLUSIVE };
 
   // Finds the node with the closest key <= the given key
   RBNode* closest_leq(const K& key) {
@@ -278,9 +301,33 @@ public:
     return cursor.found() ? cursor.node()->next() : cursor._parent;
   }
 
+  RBNode* closest_leq(const K& k) const {
+    return const_cast<RBTree<K, V, COMPARATOR, ALLOCATOR>*>(this)->closest_leq(k);
+  }
+
+  RBNode* closest_gt(const K& k) const {
+    return const_cast<RBTree<K, V, COMPARATOR, ALLOCATOR>*>(this)->closest_gt(k);
+  }
+
+  struct Range {
+    RBNode* start;
+    RBNode* end;
+    Range(RBNode* start, RBNode* end)
+    : start(start), end(end) {}
+  };
+
+  // Return the range [start, end)
+  // where start->key() <= addr < end->key().
+  // Failure to find the range leads to start and/or end being null.
+  Range find_enclosing_range(K addr) {
+    RBNode* start = closest_leq(addr);
+    RBNode* end = closest_gt(addr);
+    return Range(start, end);
+  }
+
   // Visit all RBNodes in ascending order, calling f on each node.
   template <typename F>
-  void visit_in_order(F f);
+  void visit_in_order(F f) const;
 
   // Visit all RBNodes in ascending order whose keys are in range [from, to), calling f on each node.
   template <typename F>
@@ -293,11 +340,11 @@ public:
 
 };
 
-template <MemTag mt>
+template <MemTag mem_tag>
 class RBTreeCHeapAllocator {
 public:
   void* allocate(size_t sz) {
-    void* allocation = os::malloc(sz, mt);
+    void* allocation = os::malloc(sz, mem_tag);
     if (allocation == nullptr) {
       vm_exit_out_of_memory(sz, OOM_MALLOC_ERROR,
                             "red-black tree failed allocation");
@@ -320,8 +367,8 @@ public:
   }
 };
 
-template <typename K, typename V, typename COMPARATOR, MemTag mt>
-using RBTreeCHeap = RBTree<K, V, COMPARATOR, RBTreeCHeapAllocator<mt>>;
+template <typename K, typename V, typename COMPARATOR, MemTag mem_tag>
+using RBTreeCHeap = RBTree<K, V, COMPARATOR, RBTreeCHeapAllocator<mem_tag>>;
 
 template <typename K, typename COMPARATOR>
 using IntrusiveRBTree = RBTree<K, Empty, COMPARATOR, RBTreeNoopAllocator>;

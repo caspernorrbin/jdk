@@ -30,6 +30,7 @@
 #include "utilities/growableArray.hpp"
 #include "utilities/rbTree.hpp"
 #include "utilities/rbTree.inline.hpp"
+#include <cstddef>
 
 
 class RBTreeTest : public testing::Test {
@@ -54,6 +55,25 @@ public:
     }
   };
 
+// Bump-pointer style allocator that can't free
+template <size_t AreaSize>
+struct ArrayAllocator {
+  uint8_t area[AreaSize];
+  size_t offset = 0;
+
+  void* allocate(size_t sz) {
+    if (offset + sz > AreaSize) {
+      vm_exit_out_of_memory(sz, OOM_MALLOC_ERROR,
+                            "red-black tree failed allocation");
+    }
+    void* place = &area[offset];
+    offset += sz;
+    return place;
+  }
+
+  void free(void* ptr) { }
+};
+
 #ifdef ASSERT
   template<typename K, typename V, typename CMP, typename ALLOC>
   void verify_it(RBTree<K, V, CMP, ALLOC>& t) {
@@ -65,7 +85,7 @@ using RBTreeInt = RBTreeCHeap<int, int, Cmp, mtOther>;
 
 public:
   void inserting_duplicates_results_in_one_value() {
-    constexpr const int up_to = 10;
+    constexpr int up_to = 10;
     GrowableArrayCHeap<int, mtTest> nums_seen(up_to, up_to, 0);
     RBTreeInt rbtree;
 
@@ -108,7 +128,7 @@ public:
       }
     };
 
-    constexpr const int up_to = 10;
+    constexpr int up_to = 10;
     {
       RBTree<int, int, Cmp, LeakCheckedAllocator> rbtree;
       for (int i = 0; i < up_to; i++) {
@@ -142,7 +162,7 @@ public:
     auto test = [&](float f) {
       EXPECT_EQ(nullptr, rbtree.find(f));
       rbtree.upsert(f, Empty{});
-      Node* n = rbtree.find_node(f);
+      const Node* n = rbtree.find_node(f);
       EXPECT_NE(nullptr, n);
       EXPECT_EQ(f, n->key());
     };
@@ -342,6 +362,47 @@ public:
     rbtree.remove(2);
     n = rbtree.first();
     EXPECT_EQ(nullptr, n);
+
+  }
+
+  void test_node_prev() {
+    RBTreeInt _tree;
+    using Node = RBTreeInt::RBNode;
+    constexpr int num_nodes = 100;
+
+    for (int i = num_nodes; i > 0; i--) {
+      _tree.upsert(i, i);
+    }
+
+    Node* node = _tree.find_node(num_nodes);
+    int count = num_nodes;
+    while (node != nullptr) {
+      EXPECT_EQ(count, node->val());
+      node = node->prev();
+      count--;
+    }
+
+    EXPECT_EQ(count, 0);
+  }
+
+    void test_node_next() {
+    RBTreeInt _tree;
+    using Node = RBTreeInt::RBNode;
+    constexpr int num_nodes = 100;
+
+    for (int i = 0; i < num_nodes; i++) {
+      _tree.upsert(i, i);
+    }
+
+    Node* node = _tree.find_node(0);
+    int count = 0;
+    while (node != nullptr) {
+      EXPECT_EQ(count, node->val());
+      node = node->next();
+      count++;
+    }
+
+    EXPECT_EQ(count, num_nodes);
   }
 
   void test_stable_nodes() {
@@ -365,7 +426,7 @@ public:
 
     // After deleting, nodes should have been moved around but kept their values
     for (int i = 0; i < 10000; i++) {
-      Node* n = rbtree.find_node(i);
+      const Node* n = rbtree.find_node(i);
       if (n != nullptr) {
         EXPECT_EQ(a.at(i), n);
       }
@@ -537,6 +598,36 @@ public:
     for (int n = 0; n < num_iterations; n++) {
       Tree::Cursor cursor = intrusive_tree.cursor_find(n);
       EXPECT_NULL(cursor.node());
+
+    }
+  }
+
+  void test_nodes_visited_once() {
+    constexpr size_t memory_size = 65536;
+    using Tree = RBTree<int, int, Cmp, ArrayAllocator<memory_size>>;
+    using Node = Tree::RBNode;
+
+    Tree tree;
+
+    int num_nodes = memory_size / sizeof(Node);
+    for (int i = 0; i < num_nodes; i++) {
+      tree.upsert(i, i);
+    }
+
+    Node* start = tree.find_node(0);
+
+    Node* node = start;
+    for (int i = 0; i < num_nodes; i++) {
+      EXPECT_EQ(tree._expected_visited, node->_visited);
+      node += 1;
+    }
+
+    tree.verify_self();
+
+    node = start;
+    for (int i = 0; i < num_nodes; i++) {
+      EXPECT_EQ(tree._expected_visited, node->_visited);
+      node += 1;
     }
 
   }
@@ -572,6 +663,14 @@ TEST_VM_F(RBTreeTest, TestFirst) {
   this->test_first();
 }
 
+TEST_VM_F(RBTreeTest, NodePrev) {
+  this->test_node_prev();
+}
+
+TEST_VM_F(RBTreeTest, NodeNext) {
+  this->test_node_next();
+}
+
 TEST_VM_F(RBTreeTest, NodeStableTest) {
   this->test_stable_nodes();
 }
@@ -597,11 +696,30 @@ TEST_VM_F(RBTreeTest, FillAndVerify) {
   this->test_fill_verify();
 }
 
+TEST_VM_F(RBTreeTest, NodesVisitedOnce) {
+  this->test_nodes_visited_once();
+}
+
+TEST_VM_F(RBTreeTest, InsertRemoveVerify) {
+  constexpr int num_nodes = 100;
+  for (int n_t1 = 0; n_t1 < num_nodes; n_t1++) {
+    for (int n_t2 = 0; n_t2 < n_t1; n_t2++) {
+      RBTreeInt tree;
+      for (int i = 0; i < n_t1; i++) {
+        tree.upsert(i, i);
+      }
+      for (int i = 0; i < n_t2; i++) {
+        tree.remove(i);
+      }
+      verify_it(tree);
+    }
+  }
+}
 
 TEST_VM_F(RBTreeTest, VerifyItThroughStressTest) {
   { // Repeatedly verify a tree of moderate size
     RBTreeInt rbtree;
-    constexpr const int ten_thousand = 10000;
+    constexpr int ten_thousand = 10000;
     for (int i = 0; i < ten_thousand; i++) {
       int r = os::random();
       if (r % 2 == 0) {
@@ -628,7 +746,7 @@ TEST_VM_F(RBTreeTest, VerifyItThroughStressTest) {
   { // Make a very large tree and verify at the end
   struct Nothing {};
     RBTreeCHeap<int, Nothing, Cmp, mtOther> rbtree;
-    constexpr const int one_hundred_thousand = 100000;
+    constexpr int one_hundred_thousand = 100000;
     for (int i = 0; i < one_hundred_thousand; i++) {
       rbtree.upsert(i, Nothing());
     }
