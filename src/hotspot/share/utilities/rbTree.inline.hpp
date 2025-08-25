@@ -731,21 +731,23 @@ inline void RBNode<K, V>::print_on(outputStream* st, int depth) const {
 }
 
 template <typename K, typename NodeType, typename COMPARATOR>
-void AbstractRBTree<K, NodeType, COMPARATOR>::print_node_on(outputStream* st, int depth, const NodeType* n) const {
-  n->print_on(st, depth);
+template <typename PRINTER>
+void AbstractRBTree<K, NodeType, COMPARATOR>::print_node_on(outputStream* st, int depth, const NodeType* n, const PRINTER& node_printer) const {
+  node_printer(n, st, depth);
   depth++;
   if (n->_right != nullptr) {
-    print_node_on(st, depth, (NodeType*)n->_right);
+    print_node_on(st, depth, (NodeType*)n->_right, node_printer);
   }
   if (n->_left != nullptr) {
-    print_node_on(st, depth, (NodeType*)n->_left);
+    print_node_on(st, depth, (NodeType*)n->_left, node_printer);
   }
 }
 
 template <typename K, typename NodeType, typename COMPARATOR>
-void AbstractRBTree<K, NodeType, COMPARATOR>::print_on(outputStream* st) const {
+template <typename PRINTER>
+void AbstractRBTree<K, NodeType, COMPARATOR>::print_on(outputStream* st, const PRINTER& node_printer) const {
   if (_root != nullptr) {
-    print_node_on(st, 0, (NodeType*)_root);
+    print_node_on(st, 0, (NodeType*)_root, node_printer);
   }
 }
 

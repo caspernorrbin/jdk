@@ -260,7 +260,17 @@ private:
   template <typename NodeVerifier>
   void verify_self(NodeVerifier verifier) const;
 
-  void print_node_on(outputStream* st, int depth, const NodeType* n) const;
+      struct default_printer {
+        void operator()(const NodeType* n,
+                        outputStream*   st,
+                        int             depth) const
+        {
+            n->print_on(st, depth);      // original behaviour
+        }
+    };
+
+  template <typename PRINTER>
+  void print_node_on(outputStream* st, int depth, const NodeType* n, const PRINTER& node_printer) const;
 
 public:
   NONCOPYABLE(AbstractRBTree);
@@ -438,7 +448,10 @@ public:
     verify_self([](const NodeType*, const NodeType*){ return true;});
   }
 
-  void print_on(outputStream* st) const;
+  // Accepts an optional printing callable node_printer(Node* n, outputStream* st, int depth).
+  // If provided, each node is printed through this callable rather than the default Node::print_on.
+  template <typename PRINTER = default_printer>
+  void print_on(outputStream* st, const PRINTER& node_printer = PRINTER()) const;
 
 };
 
