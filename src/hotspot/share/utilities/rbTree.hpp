@@ -202,15 +202,6 @@ private:
   static constexpr bool HasNodeComparator =
       std::is_invocable_r_v<RBTreeOrdering, decltype(&COMPARATOR::cmp), K, const NodeType*>;
 
-  // template <typename CMP, typename = void>
-  // static constexpr bool HasNodeVerifierImpl = false;
-
-  // template <typename CMP>
-  // static constexpr bool HasNodeVerifierImpl<CMP, std::void_t<decltype(&CMP::less_than)>> =
-  //     std::is_invocable_r_v<bool, decltype(&CMP::less_than), const NodeType*, const NodeType*>;
-
-  // static constexpr bool HasNodeVerifier = HasNodeVerifierImpl<COMPARATOR>;
-
   template<typename, typename = void>
   struct has_node_verifier : std::false_type {};
 
