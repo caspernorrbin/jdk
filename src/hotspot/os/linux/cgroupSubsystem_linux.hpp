@@ -188,7 +188,7 @@ class CachedMetric : public CHeapObj<mtInternal>{
     volatile jlong _next_check_counter;
   public:
     CachedMetric() {
-      _metric = value_unlimited;
+      _metric = std::numeric_limits<MetricType>::max();
       _next_check_counter = min_jlong;
     }
     bool should_check_metric() {
