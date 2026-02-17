@@ -790,12 +790,14 @@ inline NodeType* AbstractRBTree<K, NodeType, COMPARATOR>::find_node(const K& key
 
 template <typename K, typename NodeType, typename COMPARATOR>
 inline void AbstractRBTree<K, NodeType, COMPARATOR>::insert(const K& key, NodeType* node, const NodeType* hint_node) {
+  precond(node != nullptr);
   Cursor node_cursor = cursor(key, hint_node);
   insert_at_cursor(node, node_cursor);
 }
 
 template <typename K, typename NodeType, typename COMPARATOR>
 inline void AbstractRBTree<K, NodeType, COMPARATOR>::remove(NodeType* node) {
+  precond(node != nullptr);
   Cursor node_cursor = cursor(node);
   remove_at_cursor(node_cursor);
 }
@@ -1054,9 +1056,9 @@ inline RBTree<K, V, COMPARATOR, ALLOCATOR>::~RBTree() {
 
 template<typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 bool RBTree<K, V, COMPARATOR, ALLOCATOR>::copy_into(RBTree& other) const {
-  assert(other.size() == 0, "You can only copy into an empty RBTree");
-  assert(std::is_copy_constructible<K>::value, "Key type must be copy-constructible when copying a RBTree");
-  assert(std::is_copy_constructible<V>::value, "Value type must be copy-constructible when copying a RBTree");
+  precond(other.size() == 0);
+  precond(std::is_copy_constructible<K>::value);
+  precond(std::is_copy_constructible<V>::value);
   enum class Dir { Left, Right };
   struct node_pair { const IntrusiveRBNode* current; IntrusiveRBNode* other_parent; Dir dir; };
   struct stack {
@@ -1103,6 +1105,9 @@ bool RBTree<K, V, COMPARATOR, ALLOCATOR>::copy_into(RBTree& other) const {
 
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::replace_at_cursor(RBNode<K, V>* new_node, const Cursor& node_cursor) {
+  precond(new_node != nullptr);
+  precond(node_cursor.valid());
+  precond(node_cursor.found());
   RBNode<K, V>* old_node = node_cursor.node();
   BaseType::replace_at_cursor(new_node, node_cursor);
   free_node(old_node);
@@ -1128,6 +1133,7 @@ inline RBNode<K, V>* RBTree<K, V, COMPARATOR, ALLOCATOR>::allocate_node(const K&
 
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::free_node(RBNode<K, V>* node) {
+  precond(node != nullptr);
   node->_value.~V();
   _allocator.free(node);
 }
