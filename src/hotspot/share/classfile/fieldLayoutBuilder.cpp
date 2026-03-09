@@ -644,10 +644,16 @@ void FieldLayoutBuilder::compute_regular_layout() {
   if (!_contended_groups.is_empty()) {
     for (int i = 0; i < _contended_groups.length(); i++) {
       FieldGroup* cg = _contended_groups.at(i);
-      LayoutRawBlock* padding = insert_contended_padding(_layout->last_block());
+      LayoutRawBlock* start = _layout->last_block();
+      LayoutRawBlock* padding = insert_contended_padding(start);
+
       // Do not insert fields past the padding block.
-      _layout->add(cg->primitive_fields(), padding);
-      _layout->add(cg->oop_fields(), padding);
+      if (padding != nullptr) {
+        start = padding;
+      }
+
+      _layout->add(cg->primitive_fields(), start);
+      _layout->add(cg->oop_fields(), start);
       need_tail_padding = true;
     }
   }
