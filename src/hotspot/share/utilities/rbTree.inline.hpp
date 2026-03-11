@@ -1170,8 +1170,6 @@ inline void RBTree<K, V, COMPARATOR, ALLOCATOR>::update_key(RBNode<K, V>* node, 
   node->_key = new_key;
 }
 
-
-
 template <typename K, typename V, typename COMPARATOR, typename ALLOCATOR>
 inline bool RBTree<K, V, COMPARATOR, ALLOCATOR>::upsert(const K& key, const V& val, const RBNode<K, V>* hint_node) {
   Cursor node_cursor = cursor(key, hint_node);
