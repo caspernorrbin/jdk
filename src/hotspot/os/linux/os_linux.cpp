@@ -3523,6 +3523,9 @@ bool os::pd_uncommit_memory(char* addr, size_t size, bool exec) {
     log_trace(os, map)("mmap failed: " RANGEFMT " errno=(%s)",
                        RANGEFMTARGS(addr, size),
                        os::strerror(ep.saved_errno()));
+    if (ep.saved_errno() == ENOMEM) {
+      fatal("Failed to uncommit " RANGEFMT ". It is possible that the process's maximum number of mappings would have been exceeded. Try increasing the limit.", RANGEFMTARGS(addr, size));
+    }
     return false;
   }
   return true;
@@ -3633,14 +3636,16 @@ bool os::pd_create_stack_guard_pages(char* addr, size_t size) {
 // It's safe to always unmap guard pages for primordial thread because we
 // always place it right after end of the mapped region.
 
-bool os::remove_stack_guard_pages(char* addr, size_t size) {
-  uintptr_t stack_extent, stack_base;
+void os::remove_stack_guard_pages(char* addr, size_t size) {
 
   if (os::is_primordial_thread()) {
-    return ::munmap(addr, size) == 0;
+    if (::munmap(addr, size) != 0) {
+      fatal("Failed to munmap " RANGEFMT, RANGEFMTARGS(addr, size));
+    }
+    return;
   }
 
-  return os::uncommit_memory(addr, size);
+  os::uncommit_memory(addr, size);
 }
 
 // 'requested_addr' is only treated as a hint, the return value may or
@@ -4203,12 +4208,6 @@ char* os::pd_reserve_memory_special(size_t bytes, size_t alignment, size_t page_
   return addr;
 }
 
-bool os::pd_release_memory_special(char* base, size_t bytes) {
-  assert(UseLargePages, "only for large pages");
-  // Plain munmap is sufficient
-  return pd_release_memory(base, bytes);
-}
-
 size_t os::large_page_size() {
   return _large_page_size;
 }
@@ -4550,6 +4549,7 @@ void os::Linux::numa_init() {
     FLAG_SET_ERGO_IF_DEFAULT(UseNUMAInterleaving, true);
   }
 
+#if INCLUDE_PARALLELGC
   if (UseParallelGC && UseNUMA && UseLargePages && !can_commit_large_page_memory()) {
     // With static large pages we cannot uncommit a page, so there's no way
     // we can make the adaptive lgrp chunk resizing work. If the user specified both
@@ -4561,6 +4561,7 @@ void os::Linux::numa_init() {
       UseAdaptiveNUMAChunkSizing = false;
     }
   }
+#endif
 }
 
 void os::Linux::disable_numa(const char* reason, bool warning) {

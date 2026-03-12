@@ -199,19 +199,6 @@ const int ObjectAlignmentInBytes = 8;
           "Granularity to use for NUMA interleaving on Windows OS")         \
           constraint(NUMAInterleaveGranularityConstraintFunc, AtParse)      \
                                                                             \
-  product(uintx, NUMAChunkResizeWeight, 20,                                 \
-          "Percentage (0-100) used to weight the current sample when "      \
-          "computing exponentially decaying average for "                   \
-          "AdaptiveNUMAChunkSizing")                                        \
-          range(0, 100)                                                     \
-                                                                            \
-  product(size_t, NUMASpaceResizeRate, 1*G,                                 \
-          "Do not reallocate more than this amount per collection")         \
-          range(0, max_uintx)                                               \
-                                                                            \
-  product(bool, UseAdaptiveNUMAChunkSizing, true,                           \
-          "Enable adaptive chunk sizing for NUMA")                          \
-                                                                            \
   product(bool, NUMAStats, false,                                           \
           "Print NUMA stats in detailed heap information")                  \
                                                                             \
@@ -1508,8 +1495,9 @@ const int ObjectAlignmentInBytes = 8;
           range(1, 1024)                                                    \
           constraint(CodeCacheSegmentSizeConstraintFunc, AfterErgo)         \
                                                                             \
-  product_pd(intx, CodeEntryAlignment, EXPERIMENTAL,                        \
-          "Code entry alignment for generated code (in bytes)")             \
+  product_pd(uint, CodeEntryAlignment, EXPERIMENTAL,                        \
+          "Code entry alignment for generated code"                         \
+          " (in bytes, power of two)")                                      \
           constraint(CodeEntryAlignmentConstraintFunc, AfterErgo)           \
                                                                             \
   product_pd(intx, OptoLoopAlignment,                                       \
