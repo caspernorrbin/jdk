@@ -3020,9 +3020,12 @@ static char* allocate_pages_individually(size_t bytes, char* addr, DWORD flags,
                                          DWORD prot,
                                          bool should_inject_error = false) {
   char * p_buf;
+  assert(UseLargePagesIndividualAllocation || UseNUMAInterleaving,
+         "This path is only used for large page individual allocations or interleaving NUMA allocations");
   // note: at setup time we guaranteed that NUMAInterleaveGranularity was aligned up to a page size
   size_t page_size = UseLargePages ? _large_page_size : os::vm_page_size();
   size_t chunk_size = UseNUMAInterleaving ? NUMAInterleaveGranularity : page_size;
+  assert(chunk_size >= page_size, "Chunk size must be at least page size");
 
   // first reserve enough address space in advance since we want to be
   // able to break a single contiguous virtual address range into multiple

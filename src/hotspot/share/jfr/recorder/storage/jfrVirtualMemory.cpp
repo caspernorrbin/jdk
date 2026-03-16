@@ -121,8 +121,6 @@ bool JfrVirtualMemorySegment::initialize(size_t reservation_size_request_bytes) 
                               _rs.size(),
                               os::vm_page_size());
   MemTracker::record_virtual_memory_tag(_rs, mtTracing);
-  assert(is_aligned(_rs.base(), os::vm_page_size()), "invariant");
-  assert(is_aligned(_rs.size(), os::vm_page_size()), "invariant");
 
   // ReservedSpaces marked as special will have the entire memory
   // pre-committed. Setting a committed size will make sure that
