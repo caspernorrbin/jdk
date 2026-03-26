@@ -37,8 +37,8 @@ import jdk.internal.vm.annotation.Contended;
 public class MixedPrimitives {
 
     private static final Unsafe U = Unsafe.getUnsafe();
-    private static int ADDRESS_SIZE;
-    private static int HEADER_SIZE;
+    private static final int ADDRESS_SIZE;
+    private static final int HEADER_SIZE;
 
     static {
         // When running with CompressedOops on 64-bit platform, the address size
@@ -50,7 +50,7 @@ public class MixedPrimitives {
             ADDRESS_SIZE = (int) Math.abs(off2 - off1);
             HEADER_SIZE = (int) Math.min(off1, off2);
         } catch (NoSuchFieldException e) {
-            ADDRESS_SIZE = -1;
+            throw new ExceptionInInitializerError(e);
         }
     }
 
@@ -88,18 +88,23 @@ public class MixedPrimitives {
     }
 
     public static boolean sameLayout(Class klass1, Class klass2) throws Exception {
-        for (Field f1 : klass1.getDeclaredFields()) {
-            Field f2 = klass2.getDeclaredField(f1.getName());
-            if (offset(f1) != offset(f2)) {
-                return false;
+        try {
+            for (Field f1 : klass1.getDeclaredFields()) {
+                Field f2 = klass2.getDeclaredField(f1.getName());
+                if (offset(f1) != offset(f2)) {
+                    return false;
+                }
             }
-        }
 
-        for (Field f2 : klass1.getDeclaredFields()) {
-            Field f1 = klass2.getDeclaredField(f2.getName());
-            if (offset(f1) != offset(f2)) {
-                return false;
+            for (Field f2 : klass1.getDeclaredFields()) {
+                Field f1 = klass2.getDeclaredField(f2.getName());
+                if (offset(f1) != offset(f2)) {
+                    return false;
+                }
             }
+        } catch (Exception e) {
+            System.err.println("Failed getting layout from class: " + e.getMessage());
+            return false;
         }
 
         return true;
@@ -131,7 +136,7 @@ public class MixedPrimitives {
     }
 
     public static void main(String[] args) throws Exception {
-        boolean endResult = true;
+        int failures = 0;
 
         // --------------- INSTANCE FIELDS ---------------------
 
@@ -142,7 +147,7 @@ public class MixedPrimitives {
                 isPadded(Test1.class, "int1") ||
                 isPadded(Test1.class, "short1")) {
             System.err.println("Test1 failed");
-            endResult &= false;
+            failures += 1;
         }
 
         if (!arePaddedPairwise(Test2.class, "long1", "int1") ||
@@ -152,7 +157,7 @@ public class MixedPrimitives {
                 isPadded(Test2.class, "int1") ||
                 isPadded(Test2.class, "short1")) {
             System.err.println("Test2 failed");
-            endResult &= false;
+            failures += 1;
         }
 
         if (!arePaddedPairwise(Test3.class, "long1", "int1") ||
@@ -162,7 +167,7 @@ public class MixedPrimitives {
                 !isPadded(Test3.class, "int1") ||
                 !isPadded(Test3.class, "short1")) {
             System.err.println("Test3 failed");
-            endResult &= false;
+            failures += 1;
         }
 
         if (arePaddedPairwise(Test4.class, "long1", "int1") ||
@@ -172,7 +177,7 @@ public class MixedPrimitives {
                 !isPadded(Test4.class, "int1") ||
                 !isPadded(Test4.class, "short1")) {
             System.err.println("Test4 failed");
-            endResult &= false;
+            failures += 1;
         }
 
         if (!arePaddedPairwise(Test5.class, "long1", "int1") ||
@@ -182,7 +187,7 @@ public class MixedPrimitives {
                 !isPadded(Test5.class, "int1") ||
                 !isPadded(Test5.class, "short1")) {
             System.err.println("Test5 failed");
-            endResult &= false;
+            failures += 1;
         }
 
         if (!arePaddedPairwise(Test6.class, "long1", "int1") ||
@@ -192,7 +197,7 @@ public class MixedPrimitives {
                 !isPadded(Test6.class, "int1") ||
                 !isPadded(Test6.class, "short1")) {
             System.err.println("Test6 failed");
-            endResult &= false;
+            failures += 1;
         }
 
         if (arePaddedPairwise(Test7.class, "long1", "int1") ||
@@ -202,7 +207,7 @@ public class MixedPrimitives {
                 !isPadded(Test7.class, "int1") ||
                 !isPadded(Test7.class, "short1")) {
             System.err.println("Test7 failed");
-            endResult &= false;
+            failures += 1;
         }
 
         if (!arePaddedPairwise(Test8.class, "long1", "int1") ||
@@ -212,7 +217,7 @@ public class MixedPrimitives {
                 !isPadded(Test8.class, "int1") ||
                 !isPadded(Test8.class, "short1")) {
             System.err.println("Test8 failed");
-            endResult &= false;
+            failures += 1;
         }
 
         if (!arePaddedPairwise(Test9.class, "long1", "int1") ||
@@ -222,27 +227,27 @@ public class MixedPrimitives {
                 !isPadded(Test9.class, "int1") ||
                 !isPadded(Test9.class, "short1")) {
             System.err.println("Test9 failed");
-            endResult &= false;
+            failures += 1;
         }
 
         if (!sameLayout(Test4.class, Test7.class)) {
             System.err.println("Test4 and Test7 have different layouts");
-            endResult &= false;
+            failures += 1;
         }
 
         if (!sameLayout(Test5.class, Test6.class)) {
             System.err.println("Test5 and Test6 have different layouts");
-            endResult &= false;
+            failures += 1;
         }
 
         if (!sameLayout(Test8.class, Test9.class)) {
             System.err.println("Test8 and Test9 have different layouts");
-            endResult &= false;
+            failures += 1;
         }
 
-        System.out.println(endResult ? "Test PASSES" : "Test FAILS");
-        if (!endResult) {
-           throw new Error("Test failed");
+        System.out.println(failures == 0 ? "Test PASSES" : "Test FAILS");
+        if (failures > 0) {
+           throw new Error("Test failed. Incurred " + failures + " failures.");
         }
     }
 
