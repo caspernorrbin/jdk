@@ -138,97 +138,15 @@ public class MixedPrimitives {
     public static void main(String[] args) throws Exception {
         int failures = 0;
 
-        // --------------- INSTANCE FIELDS ---------------------
-
-        if (arePaddedPairwise(Test1.class, "long1", "int1") ||
-                arePaddedPairwise(Test1.class, "long1", "short1") ||
-                arePaddedPairwise(Test1.class, "int1", "short1") ||
-                isPadded(Test1.class, "long1") ||
-                isPadded(Test1.class, "int1") ||
-                isPadded(Test1.class, "short1")) {
-            System.err.println("Test1 failed");
-            failures += 1;
-        }
-
-        if (!arePaddedPairwise(Test2.class, "long1", "int1") ||
-                !arePaddedPairwise(Test2.class, "long1", "short1") ||
-                arePaddedPairwise(Test2.class, "int1", "short1") ||
-                !isPadded(Test2.class, "long1") ||
-                isPadded(Test2.class, "int1") ||
-                isPadded(Test2.class, "short1")) {
-            System.err.println("Test2 failed");
-            failures += 1;
-        }
-
-        if (!arePaddedPairwise(Test3.class, "long1", "int1") ||
-                !arePaddedPairwise(Test3.class, "long1", "short1") ||
-                !arePaddedPairwise(Test3.class, "int1", "short1") ||
-                !isPadded(Test3.class, "long1") ||
-                !isPadded(Test3.class, "int1") ||
-                !isPadded(Test3.class, "short1")) {
-            System.err.println("Test3 failed");
-            failures += 1;
-        }
-
-        if (arePaddedPairwise(Test4.class, "long1", "int1") ||
-                arePaddedPairwise(Test4.class, "long1", "short1") ||
-                arePaddedPairwise(Test4.class, "int1", "short1") ||
-                !isPadded(Test4.class, "long1") ||
-                !isPadded(Test4.class, "int1") ||
-                !isPadded(Test4.class, "short1")) {
-            System.err.println("Test4 failed");
-            failures += 1;
-        }
-
-        if (!arePaddedPairwise(Test5.class, "long1", "int1") ||
-                !arePaddedPairwise(Test5.class, "long1", "short1") ||
-                !arePaddedPairwise(Test5.class, "int1", "short1") ||
-                !isPadded(Test5.class, "long1") ||
-                !isPadded(Test5.class, "int1") ||
-                !isPadded(Test5.class, "short1")) {
-            System.err.println("Test5 failed");
-            failures += 1;
-        }
-
-        if (!arePaddedPairwise(Test6.class, "long1", "int1") ||
-                !arePaddedPairwise(Test6.class, "long1", "short1") ||
-                !arePaddedPairwise(Test6.class, "int1", "short1") ||
-                !isPadded(Test6.class, "long1") ||
-                !isPadded(Test6.class, "int1") ||
-                !isPadded(Test6.class, "short1")) {
-            System.err.println("Test6 failed");
-            failures += 1;
-        }
-
-        if (arePaddedPairwise(Test7.class, "long1", "int1") ||
-                arePaddedPairwise(Test7.class, "long1", "short1") ||
-                arePaddedPairwise(Test7.class, "int1", "short1") ||
-                !isPadded(Test7.class, "long1") ||
-                !isPadded(Test7.class, "int1") ||
-                !isPadded(Test7.class, "short1")) {
-            System.err.println("Test7 failed");
-            failures += 1;
-        }
-
-        if (!arePaddedPairwise(Test8.class, "long1", "int1") ||
-                !arePaddedPairwise(Test8.class, "long1", "short1") ||
-                arePaddedPairwise(Test8.class, "int1", "short1") ||
-                !isPadded(Test8.class, "long1") ||
-                !isPadded(Test8.class, "int1") ||
-                !isPadded(Test8.class, "short1")) {
-            System.err.println("Test8 failed");
-            failures += 1;
-        }
-
-        if (!arePaddedPairwise(Test9.class, "long1", "int1") ||
-                !arePaddedPairwise(Test9.class, "long1", "short1") ||
-                arePaddedPairwise(Test9.class, "int1", "short1") ||
-                !isPadded(Test9.class, "long1") ||
-                !isPadded(Test9.class, "int1") ||
-                !isPadded(Test9.class, "short1")) {
-            System.err.println("Test9 failed");
-            failures += 1;
-        }
+        failures += Test1.checkLayout();
+        failures += Test2.checkLayout();
+        failures += Test3.checkLayout();
+        failures += Test4.checkLayout();
+        failures += Test5.checkLayout();
+        failures += Test6.checkLayout();
+        failures += Test7.checkLayout();
+        failures += Test8.checkLayout();
+        failures += Test9.checkLayout();
 
         if (!sameLayout(Test4.class, Test7.class)) {
             System.err.println("Test4 and Test7 have different layouts");
@@ -251,13 +169,24 @@ public class MixedPrimitives {
         }
     }
 
-    // ----------------------------------- INSTANCE FIELDS -----------------------------------------
-
     // naturally packed
     public static class Test1 {
                                  private long long1;
                                  private int int1;
                                  private short short1;
+
+        public static int checkLayout() throws Exception {
+            if (arePaddedPairwise(Test1.class, "long1", "int1") ||
+                    arePaddedPairwise(Test1.class, "long1", "short1") ||
+                    arePaddedPairwise(Test1.class, "int1", "short1") ||
+                    isPadded(Test1.class, "long1") ||
+                    isPadded(Test1.class, "int1") ||
+                    isPadded(Test1.class, "short1")) {
+                System.err.println("Test1 failed");
+                return 1;
+            }
+            return 0;
+        }
     }
 
     // long1 is padded
@@ -265,6 +194,19 @@ public class MixedPrimitives {
         @Contended               private long long1;
                                  private int int1;
                                  private short short1;
+
+        public static int checkLayout() throws Exception {
+            if (!arePaddedPairwise(Test2.class, "long1", "int1") ||
+                    !arePaddedPairwise(Test2.class, "long1", "short1") ||
+                    arePaddedPairwise(Test2.class, "int1", "short1") ||
+                    !isPadded(Test2.class, "long1") ||
+                    isPadded(Test2.class, "int1") ||
+                    isPadded(Test2.class, "short1")) {
+                System.err.println("Test2 failed");
+                return 1;
+            }
+            return 0;
+        }
     }
 
     // both fields are padded
@@ -272,6 +214,19 @@ public class MixedPrimitives {
         @Contended               private long long1;
         @Contended               private int int1;
         @Contended               private short short1;
+
+        public static int checkLayout() throws Exception {
+            if (!arePaddedPairwise(Test3.class, "long1", "int1") ||
+                    !arePaddedPairwise(Test3.class, "long1", "short1") ||
+                    !arePaddedPairwise(Test3.class, "int1", "short1") ||
+                    !isPadded(Test3.class, "long1") ||
+                    !isPadded(Test3.class, "int1") ||
+                    !isPadded(Test3.class, "short1")) {
+                System.err.println("Test3 failed");
+                return 1;
+            }
+            return 0;
+        }
     }
 
     // fields are padded in the singular group
@@ -279,6 +234,19 @@ public class MixedPrimitives {
         @Contended("sameGroup")  private long long1;
         @Contended("sameGroup")  private int int1;
         @Contended("sameGroup")  private short short1;
+
+        public static int checkLayout() throws Exception {
+            if (arePaddedPairwise(Test4.class, "long1", "int1") ||
+                    arePaddedPairwise(Test4.class, "long1", "short1") ||
+                    arePaddedPairwise(Test4.class, "int1", "short1") ||
+                    !isPadded(Test4.class, "long1") ||
+                    !isPadded(Test4.class, "int1") ||
+                    !isPadded(Test4.class, "short1")) {
+                System.err.println("Test4 failed");
+                return 1;
+            }
+            return 0;
+        }
     }
 
     // fields are padded in disjoint groups
@@ -286,6 +254,19 @@ public class MixedPrimitives {
         @Contended("diffGroup1") private long long1;
         @Contended("diffGroup2") private int int1;
         @Contended("diffGroup3") private short short1;
+
+        public static int checkLayout() throws Exception {
+            if (!arePaddedPairwise(Test5.class, "long1", "int1") ||
+                    !arePaddedPairwise(Test5.class, "long1", "short1") ||
+                    !arePaddedPairwise(Test5.class, "int1", "short1") ||
+                    !isPadded(Test5.class, "long1") ||
+                    !isPadded(Test5.class, "int1") ||
+                    !isPadded(Test5.class, "short1")) {
+                System.err.println("Test5 failed");
+                return 1;
+            }
+            return 0;
+        }
     }
 
     // fields are padded in disjoint groups
@@ -293,6 +274,19 @@ public class MixedPrimitives {
         @Contended               private long long1;
         @Contended("diffGroup2") private int int1;
         @Contended("diffGroup3") private short short1;
+
+        public static int checkLayout() throws Exception {
+            if (!arePaddedPairwise(Test6.class, "long1", "int1") ||
+                    !arePaddedPairwise(Test6.class, "long1", "short1") ||
+                    !arePaddedPairwise(Test6.class, "int1", "short1") ||
+                    !isPadded(Test6.class, "long1") ||
+                    !isPadded(Test6.class, "int1") ||
+                    !isPadded(Test6.class, "short1")) {
+                System.err.println("Test6 failed");
+                return 1;
+            }
+            return 0;
+        }
     }
 
     // fields are padded in the singular group
@@ -301,6 +295,19 @@ public class MixedPrimitives {
                                  private long long1;
                                  private int int1;
                                  private short short1;
+
+        public static int checkLayout() throws Exception {
+            if (arePaddedPairwise(Test7.class, "long1", "int1") ||
+                    arePaddedPairwise(Test7.class, "long1", "short1") ||
+                    arePaddedPairwise(Test7.class, "int1", "short1") ||
+                    !isPadded(Test7.class, "long1") ||
+                    !isPadded(Test7.class, "int1") ||
+                    !isPadded(Test7.class, "short1")) {
+                System.err.println("Test7 failed");
+                return 1;
+            }
+            return 0;
+        }
     }
 
     // all fields are padded as the group, and one field is padded specifically
@@ -309,6 +316,19 @@ public class MixedPrimitives {
         @Contended               private long long1;
                                  private int int1;
                                  private short short1;
+
+        public static int checkLayout() throws Exception {
+            if (!arePaddedPairwise(Test8.class, "long1", "int1") ||
+                    !arePaddedPairwise(Test8.class, "long1", "short1") ||
+                    arePaddedPairwise(Test8.class, "int1", "short1") ||
+                    !isPadded(Test8.class, "long1") ||
+                    !isPadded(Test8.class, "int1") ||
+                    !isPadded(Test8.class, "short1")) {
+                System.err.println("Test8 failed");
+                return 1;
+            }
+            return 0;
+        }
     }
 
     // all fields are padded as the group, and one field is padded specifically
@@ -317,6 +337,19 @@ public class MixedPrimitives {
         @Contended("group")      private long long1;
                                  private int int1;
                                  private short short1;
+
+        public static int checkLayout() throws Exception {
+            if (!arePaddedPairwise(Test9.class, "long1", "int1") ||
+                    !arePaddedPairwise(Test9.class, "long1", "short1") ||
+                    arePaddedPairwise(Test9.class, "int1", "short1") ||
+                    !isPadded(Test9.class, "long1") ||
+                    !isPadded(Test9.class, "int1") ||
+                    !isPadded(Test9.class, "short1")) {
+                System.err.println("Test9 failed");
+                return 1;
+            }
+            return 0;
+        }
     }
 
 }
