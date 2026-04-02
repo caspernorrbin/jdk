@@ -138,7 +138,7 @@ public class ShareTmpDir {
             String s2 = "could not create file " + pid1 + ": existing file is not provably stale";
             Asserts.assertTrue(out1.getStdout().contains(s) ||
                                out2.getStdout().contains(s) ||
-                               out2.getStdout().contains(s2) ||
+                               out1.getStdout().contains(s2) ||
                                out2.getStdout().contains(s2));
         } else {
             throw new SkippedException("Java in the two containers don't have the same pid: " + file1 + " vs " + file2);

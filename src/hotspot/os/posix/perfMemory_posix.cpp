@@ -911,12 +911,8 @@ static int create_sharedmem_file(const char* dirname, const char* filename, size
   }
 
   int fd = OS_ERR;
-#if defined(LINUX)
-  static const int create_sharedmem_file_retry_count = 3;
+  static const int create_sharedmem_file_retry_count = LINUX_ONLY(3) NOT_LINUX(1);
   for (int attempt = 0; attempt < create_sharedmem_file_retry_count; attempt++) {
-#else
-  for (int attempt = 0; attempt < 1; attempt++) {
-#endif
     // Open the filename in the current directory.
     // Use O_EXCL so that startup never reuses an existing pid file unless it
     // has first been proven stale and removed in `cleanup_sharedmem_files`.
